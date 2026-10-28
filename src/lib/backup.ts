@@ -1,5 +1,5 @@
 import { db, type Category, type Expense, type ColorSlot, COLOR_SLOTS } from '../db'
-import { getSettings, updateSettings } from './settings'
+import { getSettings, parseSalary, updateSettings, type Salary } from './settings'
 import { todayStr } from './format'
 
 interface BackupFile {
@@ -7,6 +7,7 @@ interface BackupFile {
   version: 1
   exportedAt: string
   monthlyBudget?: number
+  salary?: Salary
   categories: Category[]
   expenses: Expense[]
 }
@@ -31,6 +32,7 @@ export async function exportJSON() {
     version: 1,
     exportedAt: new Date().toISOString(),
     monthlyBudget: getSettings().monthlyBudget,
+    salary: getSettings().salary,
     categories,
     expenses,
   }
@@ -122,5 +124,7 @@ export async function importJSON(file: File): Promise<{ categories: number; expe
   if (typeof b.monthlyBudget === 'number' && b.monthlyBudget > 0) {
     updateSettings({ monthlyBudget: Math.round(b.monthlyBudget) })
   }
+  const salary = parseSalary(b.salary)
+  if (salary) updateSettings({ salary })
   return { categories: categories.length, expenses: expenses.length }
 }

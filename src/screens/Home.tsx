@@ -2,23 +2,30 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronRight, Leaf, TrendingDown, TrendingUp, TriangleAlert } from 'lucide-react'
 import CategoryIcon from '../components/CategoryIcon'
 import { catColor, db, type Category, type Expense } from '../db'
+import { addMonths, fmtDin, fmtNum, type Month } from '../lib/format'
 import {
-  addMonths,
-  currentMonth,
-  fmtDin,
-  fmtNum,
-  monthLabel,
-  monthRange,
-  MONTHS_LOC,
-  sameMonth,
-  type Month,
-} from '../lib/format'
-import { expensesInMonth, newestFirst, sumByCategory, totalOf } from '../lib/queries'
+  daysLeft,
+  elapsedDays,
+  periodName,
+  periodPhrase,
+  periodRange,
+  prevPhrase,
+  rangeLabel,
+  usePeriodCfg,
+  yearSuffix,
+} from '../lib/period'
+import { expensesIn, newestFirst, sumByCategory, totalOf } from '../lib/queries'
 import { useSettings } from '../lib/settings'
 import CatBarRow from '../components/CatBarRow'
 import ExpenseRow from '../components/ExpenseRow'
 import Meter from '../components/Meter'
 import MonthSwitcher from '../components/MonthSwitcher'
+import PeriodToggle from '../components/PeriodToggle'
+
+const paydayIn = (n: number) =>
+  n === 1
+    ? 'plata stiže sutra'
+    : `plata za ${n} ${n % 10 === 1 && n % 100 !== 11 ? 'dan' : 'dana'}`
 
 export default function Home({
   month,
@@ -34,10 +41,13 @@ export default function Home({
   onCategory: (c: Category, m: Month) => void
 }) {
   const settings = useSettings()
+  const cfg = usePeriodCfg()
+  const range = periodRange(month, cfg)
+  const prevRange = periodRange(addMonths(month, -1), cfg)
   const categories = useLiveQuery(() => db.categories.toArray(), []) ?? []
-  const expenses = useLiveQuery(() => expensesInMonth(month), [month.year, month.month])
-  const prev = addMonths(month, -1)
-  const prevExpenses = useLiveQuery(() => expensesInMonth(prev), [prev.year, prev.month]) ?? []
+  const expenses = useLiveQuery(() => expensesIn(range), [range.start, range.end])
+  const prevExpenses =
+    useLiveQuery(() => expensesIn(prevRange), [prevRange.start, prevRange.end]) ?? []
 
   const loaded = expenses !== undefined
   const list = expenses ?? []
@@ -47,13 +57,13 @@ export default function Home({
   const maxCat = sums[0]?.total ?? 0
   const catById = new Map(categories.map((c) => [c.id, c]))
 
-  const isCurrent = sameMonth(month, currentMonth())
-  const { days } = monthRange(month)
-  const elapsed = isCurrent ? new Date().getDate() : days
-  const avg = list.length > 0 ? total / elapsed : 0
+  // 0 for a period still ahead — no average or comparison for entries made in advance
+  const elapsed = elapsedDays(range)
+  const avg = list.length > 0 && elapsed > 0 ? total / elapsed : 0
+  const toPayday = cfg.salary ? daysLeft(range) : null
 
   const diff = total - prevTotal
-  const showDelta = prevTotal > 0 && list.length > 0 && diff !== 0
+  const showDelta = elapsed > 0 && prevTotal > 0 && list.length > 0 && diff !== 0
 
   const recent = [...list].sort(newestFirst).slice(0, 4)
 
@@ -67,25 +77,48 @@ export default function Home({
           .map((c) => ({ c, spent: spentBy.get(c.id) ?? 0 }))
       : []
 
-  const yearSuffix = month.year !== currentMonth().year ? ` ${month.year}.` : ''
+  // a smaller year keeps "Decembarska plata 2025." on one line
+  const year = yearSuffix(month, cfg)
+  const title = (
+    <>
+      {periodName(month, cfg)}
+      {year && (
+        <span className="text-xl font-semibold" style={{ color: 'var(--ink-3)' }}>
+          {year}
+        </span>
+      )}
+    </>
+  )
 
   return (
     <div className="animate-fade-in">
-      <header className="flex items-center justify-between">
-        <div>
-          <div className="text-[13px] font-medium" style={{ color: 'var(--ink-3)' }}>
-            Spent
+      {settings.salary ? (
+        // payday set: the Mesec / Plata switch takes the top row, the title gets the full width
+        <header>
+          <div className="flex items-center justify-between">
+            <PeriodToggle />
+            <MonthSwitcher month={month} onMonth={onMonth} />
           </div>
-          <h1 className="text-[28px] font-bold leading-tight">{monthLabel(month)}</h1>
-        </div>
-        <MonthSwitcher month={month} onMonth={onMonth} />
-      </header>
+          <h1 className="mt-2.5 text-[28px] font-bold leading-tight">{title}</h1>
+        </header>
+      ) : (
+        <header className="flex items-center justify-between">
+          <div>
+            <div className="text-[13px] font-medium" style={{ color: 'var(--ink-3)' }}>
+              Spent
+            </div>
+            <h1 className="text-[28px] font-bold leading-tight">{title}</h1>
+          </div>
+          <MonthSwitcher month={month} onMonth={onMonth} />
+        </header>
+      )}
 
-      {/* monthly total */}
+      {/* period total */}
       <section className="card mt-4 p-5">
         <div className="text-[13px]" style={{ color: 'var(--ink-2)' }}>
-          Potrošeno u {MONTHS_LOC[month.month]}
-          {yearSuffix}
+          {cfg.salary
+            ? rangeLabel(range) + (toPayday != null ? ` · ${paydayIn(toPayday)}` : '')
+            : `Potrošeno ${periodPhrase(month, cfg)}`}
         </div>
         <div className="mt-1.5 flex items-baseline gap-1.5">
           <span className="text-[48px] font-bold leading-none tracking-tight">{fmtNum(total)}</span>
@@ -99,10 +132,10 @@ export default function Home({
             style={{ color: diff < 0 ? 'var(--good)' : 'var(--danger)' }}
           >
             {diff < 0 ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
-            {fmtNum(Math.abs(diff))} din {diff < 0 ? 'manje' : 'više'} nego u {MONTHS_LOC[prev.month]}
+            {fmtNum(Math.abs(diff))} din {diff < 0 ? 'manje' : 'više'} nego {prevPhrase(month, cfg)}
           </div>
         )}
-        {list.length > 0 && (
+        {avg > 0 && (
           <div className="mt-1 text-[13px]" style={{ color: 'var(--ink-2)' }}>
             Prosečno {fmtDin(avg)} dnevno
           </div>
@@ -142,9 +175,11 @@ export default function Home({
           >
             <Leaf size={26} style={{ color: 'var(--accent)' }} />
           </span>
-          <p className="mt-3 text-sm font-medium">Nema troškova u ovom mesecu</p>
+          <p className="mt-3 text-sm font-medium">
+            Nema troškova u ovom {cfg.salary ? 'periodu' : 'mesecu'}
+          </p>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
-            Dodaj prvi pomoću + dugmeta
+            {elapsed === 0 ? 'Dodaj unapred pomoću + dugmeta' : 'Dodaj prvi pomoću + dugmeta'}
           </p>
         </section>
       )}

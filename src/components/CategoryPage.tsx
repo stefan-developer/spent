@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Leaf, TrendingDown, TrendingUp, TriangleAlert } from 'lucide-react'
 import { catColor, type Category, type Expense } from '../db'
-import { addMonths, currentMonth, fmtNum, MONTHS_LOC, type Month } from '../lib/format'
-import { expensesInMonth, newestFirst, totalOf } from '../lib/queries'
+import { addMonths, fmtNum, type Month } from '../lib/format'
+import { elapsedDays, periodPhrase, periodRange, prevPhrase, usePeriodCfg } from '../lib/period'
+import { expensesIn, newestFirst, totalOf } from '../lib/queries'
 import CategoryIcon from './CategoryIcon'
 import ExpenseRow from './ExpenseRow'
 import FullPage from './FullPage'
@@ -25,9 +26,12 @@ export default function CategoryPage({
   onEdit: (e: Expense) => void
 }) {
   const [month, setMonth] = useState(initialMonth)
-  const expenses = useLiveQuery(() => expensesInMonth(month), [month.year, month.month])
-  const prev = addMonths(month, -1)
-  const prevExpenses = useLiveQuery(() => expensesInMonth(prev), [prev.year, prev.month]) ?? []
+  const cfg = usePeriodCfg()
+  const range = periodRange(month, cfg)
+  const prevRange = periodRange(addMonths(month, -1), cfg)
+  const expenses = useLiveQuery(() => expensesIn(range), [range.start, range.end])
+  const prevExpenses =
+    useLiveQuery(() => expensesIn(prevRange), [prevRange.start, prevRange.end]) ?? []
 
   const loaded = expenses !== undefined
   const monthList = expenses ?? []
@@ -38,11 +42,11 @@ export default function CategoryPage({
   const share = monthTotal > 0 ? (total / monthTotal) * 100 : 0
 
   const diff = total - prevTotal
-  const showDelta = prevTotal > 0 && list.length > 0 && diff !== 0
+  const showDelta = elapsedDays(range) > 0 && prevTotal > 0 && list.length > 0 && diff !== 0
 
   const budget = category.budget ?? 0
   const color = catColor(category.color)
-  const yearSuffix = month.year !== currentMonth().year ? ` ${month.year}.` : ''
+  const phrase = periodPhrase(month, cfg)
 
   return (
     <FullPage
@@ -64,8 +68,7 @@ export default function CategoryPage({
       {/* category total for the month */}
       <section className="card mt-4 p-5">
         <div className="text-[13px]" style={{ color: 'var(--ink-2)' }}>
-          Potrošeno u {MONTHS_LOC[month.month]}
-          {yearSuffix}
+          Potrošeno {phrase}
         </div>
         <div className="mt-1.5 flex items-baseline gap-1.5">
           <span className="text-[48px] font-bold leading-none tracking-tight">{fmtNum(total)}</span>
@@ -79,7 +82,7 @@ export default function CategoryPage({
             style={{ color: diff < 0 ? 'var(--good)' : 'var(--danger)' }}
           >
             {diff < 0 ? <TrendingDown size={15} /> : <TrendingUp size={15} />}
-            {fmtNum(Math.abs(diff))} din {diff < 0 ? 'manje' : 'više'} nego u {MONTHS_LOC[prev.month]}
+            {fmtNum(Math.abs(diff))} din {diff < 0 ? 'manje' : 'više'} nego {prevPhrase(month, cfg)}
           </div>
         )}
         {list.length > 0 && (
@@ -122,10 +125,7 @@ export default function CategoryPage({
           >
             <Leaf size={26} style={{ color: 'var(--accent)' }} />
           </span>
-          <p className="mt-3 text-sm font-medium">
-            Nema troškova u {MONTHS_LOC[month.month]}
-            {yearSuffix}
-          </p>
+          <p className="mt-3 text-sm font-medium">Nema troškova {phrase}</p>
         </section>
       )}
 

@@ -1,10 +1,8 @@
 import { db, type Category, type Expense } from '../db'
-import { monthRange, type Month } from './format'
+import type { Range } from './period'
 
-export const expensesInMonth = (m: Month) => {
-  const { start, end } = monthRange(m)
-  return db.expenses.where('date').between(start, end, true, true).toArray()
-}
+export const expensesIn = ({ start, end }: Range) =>
+  db.expenses.where('date').between(start, end, true, true).toArray()
 
 export interface CatSum {
   category: Category

@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
+  Banknote,
   ChevronRight,
   Download,
   FileSpreadsheet,
@@ -18,6 +19,7 @@ import CategoryEditor from '../components/CategoryEditor'
 import CategoryIcon from '../components/CategoryIcon'
 import Confirm from '../components/Confirm'
 import FullPage from '../components/FullPage'
+import SalaryEditor from '../components/SalaryEditor'
 
 function IconChip({ color, children }: { color: string; children: ReactNode }) {
   return (
@@ -39,6 +41,7 @@ export default function More({ showToast }: { showToast: (m: string) => void }) 
   const [editingCat, setEditingCat] = useState<Category | undefined>()
   const [budgetOpen, setBudgetOpen] = useState(false)
   const [budgetStr, setBudgetStr] = useState('')
+  const [salaryOpen, setSalaryOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -134,6 +137,21 @@ export default function More({ showToast }: { showToast: (m: string) => void }) 
             <span className="block text-sm font-medium">Mesečni budžet</span>
             <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
               {settings.monthlyBudget ? fmtDin(settings.monthlyBudget) : 'Nije podešen'}
+            </span>
+          </span>
+          <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
+        </button>
+        <button
+          onClick={() => setSalaryOpen(true)}
+          className="press hairline-t flex w-full items-center gap-3 py-3 text-left"
+        >
+          <IconChip color="var(--cat-yellow)">
+            <Banknote size={17} />
+          </IconChip>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Od plate do plate</span>
+            <span className="block text-xs" style={{ color: 'var(--ink-3)' }}>
+              {settings.salary ? `Plata stiže ${settings.salary.day}. u mesecu` : 'Nije podešeno'}
             </span>
           </span>
           <ChevronRight size={16} style={{ color: 'var(--ink-3)' }} />
@@ -263,6 +281,8 @@ export default function More({ showToast }: { showToast: (m: string) => void }) 
         onConfirm={() => void doImport()}
         onCancel={cancelImport}
       />
+
+      <SalaryEditor open={salaryOpen} onClose={() => setSalaryOpen(false)} onDone={showToast} />
 
       <CategoryEditor
         open={editorOpen}

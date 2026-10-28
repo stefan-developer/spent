@@ -45,6 +45,22 @@ export const MONTHS_LOC = [
   'decembru',
 ]
 
+/** genitive case: "10. oktobra" */
+export const MONTHS_GEN = [
+  'januara',
+  'februara',
+  'marta',
+  'aprila',
+  'maja',
+  'juna',
+  'jula',
+  'avgusta',
+  'septembra',
+  'oktobra',
+  'novembra',
+  'decembra',
+]
+
 export const MONTHS_SHORT = [
   'jan',
   'feb',
@@ -71,47 +87,26 @@ export const toYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-$
 
 export const todayStr = () => toYMD(new Date())
 
-export const currentMonth = (): Month => {
-  const d = new Date()
-  return { year: d.getFullYear(), month: d.getMonth() }
-}
-
-export const monthRange = ({ year, month }: Month) => {
-  const days = new Date(year, month + 1, 0).getDate()
-  return {
-    start: `${year}-${pad(month + 1)}-01`,
-    end: `${year}-${pad(month + 1)}-${pad(days)}`,
-    days,
-  }
-}
-
 export const addMonths = ({ year, month }: Month, delta: number): Month => {
   const d = new Date(year, month + delta, 1)
   return { year: d.getFullYear(), month: d.getMonth() }
 }
 
-export const sameMonth = (a: Month, b: Month) => a.year === b.year && a.month === b.month
-
-/** "2026-08-29" -> the month it falls in */
-export const monthOf = (ymd: string): Month => {
-  const [y, m] = ymd.split('-').map(Number)
-  return { year: y, month: m - 1 }
-}
-
-export const monthLabel = (m: Month) => {
-  const now = currentMonth()
-  return m.year === now.year ? MONTHS_NOM[m.month] : `${MONTHS_NOM[m.month]} ${m.year}.`
-}
+/** Months as one running number — for comparing which comes first. */
+export const monthIdx = (m: Month) => m.year * 12 + m.month
 
 const weekdayFmt = new Intl.DateTimeFormat('sr-Latn-RS', { weekday: 'long' })
 
-/** "Danas" / "Juče" / "petak, 29. avg" */
+/** "Danas" / "Juče" / "Sutra" / "petak, 29. avg" */
 export const dayLabel = (ymd: string) => {
   const today = new Date()
   const yesterday = new Date()
   yesterday.setDate(today.getDate() - 1)
+  const tomorrow = new Date()
+  tomorrow.setDate(today.getDate() + 1)
   if (ymd === toYMD(today)) return 'Danas'
   if (ymd === toYMD(yesterday)) return 'Juče'
+  if (ymd === toYMD(tomorrow)) return 'Sutra'
   const [y, m, d] = ymd.split('-').map(Number)
   const date = new Date(y, m - 1, d)
   const weekday = weekdayFmt.format(date)

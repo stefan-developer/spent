@@ -3,8 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, Search } from 'lucide-react'
 import CategoryIcon from '../components/CategoryIcon'
 import { catColor, db, type Expense } from '../db'
-import { dayLabel, fmtDin, monthLabel, type Month } from '../lib/format'
-import { expensesInMonth, groupByDay, totalOf } from '../lib/queries'
+import { dayLabel, fmtDin, type Month } from '../lib/format'
+import { periodRange, periodTitle, usePeriodCfg } from '../lib/period'
+import { expensesIn, groupByDay, totalOf } from '../lib/queries'
 import ExpenseRow from '../components/ExpenseRow'
 import MonthSwitcher from '../components/MonthSwitcher'
 
@@ -50,8 +51,10 @@ export default function History({
   onMonth: (m: Month) => void
   onEdit: (e: Expense) => void
 }) {
+  const cfg = usePeriodCfg()
+  const range = periodRange(month, cfg)
   const categories = useLiveQuery(() => db.categories.orderBy('order').toArray(), []) ?? []
-  const expenses = useLiveQuery(() => expensesInMonth(month), [month.year, month.month])
+  const expenses = useLiveQuery(() => expensesIn(range), [range.start, range.end])
   const [q, setQ] = useState('')
   const [catFilter, setCatFilter] = useState<number | null>(null)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
@@ -97,7 +100,7 @@ export default function History({
         <div>
           <h1 className="text-[28px] font-bold leading-tight">Istorija</h1>
           <div className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
-            {monthLabel(month)} · {fmtDin(total)}
+            {periodTitle(month, cfg)} · {fmtDin(total)}
           </div>
         </div>
         <MonthSwitcher month={month} onMonth={onMonth} />
@@ -159,7 +162,9 @@ export default function History({
           >
             <CalendarDays size={26} style={{ color: 'var(--accent)' }} />
           </span>
-          <p className="mt-3 text-sm font-medium">Nema troškova u ovom mesecu</p>
+          <p className="mt-3 text-sm font-medium">
+            Nema troškova u ovom {cfg.salary ? 'periodu' : 'mesecu'}
+          </p>
         </section>
       )}
 

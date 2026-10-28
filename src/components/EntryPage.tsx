@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, Trash2 } from 'lucide-react'
 import { db, catColor, type Expense } from '../db'
-import { fmtNum, fullDateLabel, todayStr, toYMD } from '../lib/format'
+import { fmtNum, fullDateLabel, monthIdx, todayStr, toYMD } from '../lib/format'
+import { periodAcc, periodOf, usePeriodCfg } from '../lib/period'
 import FullPage from './FullPage'
 import Confirm from './Confirm'
 import CategoryIcon from './CategoryIcon'
@@ -18,14 +19,17 @@ const yesterdayStr = () => {
 export default function EntryPage({
   open,
   editing,
+  defaultDate,
   onClose,
   onDone,
 }: {
   open: boolean
   editing?: Expense
+  defaultDate: string // for new entries: today, or a day in the period on screen
   onClose: () => void
   onDone: (msg: string) => void
 }) {
+  const cfg = usePeriodCfg()
   const categories = useLiveQuery(() => db.categories.orderBy('order').toArray(), []) ?? []
   const allExpenses = useLiveQuery(() => db.expenses.toArray(), []) ?? []
   const [digits, setDigits] = useState('')
@@ -48,14 +52,14 @@ export default function EntryPage({
       setDigits('')
       setTag('')
       setNote('')
-      setDate(todayStr())
+      setDate(defaultDate)
       const last = Number(localStorage.getItem(LAST_CAT_KEY))
       setCategoryId(Number.isFinite(last) && last > 0 ? last : null)
       // focus after the slide-in so the native numeric keyboard comes up right away
       setTimeout(() => amountRef.current?.focus(), 380)
     }
     setAskDelete(false)
-  }, [open, editing])
+  }, [open, editing, defaultDate])
 
   const validCatId = useMemo(
     () => (categories.some((c) => c.id === categoryId) ? categoryId : null),
@@ -91,13 +95,18 @@ export default function EntryPage({
       tag: tag.trim() || undefined,
       note: note.trim() || undefined,
     }
+    // name the period when the entry lands outside the one it was opened from
+    const target = periodOf(date, cfg)
+    const elsewhere = (from: string) => monthIdx(periodOf(from, cfg)) !== monthIdx(target)
     if (editing) {
       await db.expenses.update(editing.id, data)
-      onDone('Izmena sačuvana')
+      onDone(
+        elsewhere(editing.date) ? `Premešteno u ${periodAcc(target, cfg)}` : 'Izmena sačuvana',
+      )
     } else {
       await db.expenses.add({ ...data, createdAt: Date.now() })
       localStorage.setItem(LAST_CAT_KEY, String(validCatId))
-      onDone('Sačuvano')
+      onDone(elsewhere(defaultDate) ? `Sačuvano za ${periodAcc(target, cfg)}` : 'Sačuvano')
     }
     onClose()
   }
@@ -239,7 +248,6 @@ export default function EntryPage({
               <input
                 type="date"
                 value={date}
-                max={today}
                 onChange={(e) => e.target.value && setDate(e.target.value)}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                 aria-label="Izaberi datum"

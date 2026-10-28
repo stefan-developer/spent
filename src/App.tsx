@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Category, Expense } from './db'
-import { currentMonth, type Month } from './lib/format'
+import { todayStr, type Month } from './lib/format'
+import { currentPeriod, defaultDateFor, remapPeriod, sameCfg, usePeriodCfg } from './lib/period'
 import TabBar, { type Tab } from './components/TabBar'
 import Toast from './components/Toast'
 import EntryPage from './components/EntryPage'
@@ -11,9 +12,17 @@ import Stats from './screens/Stats'
 import More from './screens/More'
 
 export default function App() {
+  const cfg = usePeriodCfg()
   const [tab, setTab] = useState<Tab>('home')
-  const [month, setMonth] = useState<Month>(currentMonth())
+  const [month, setMonth] = useState<Month>(() => currentPeriod(cfg))
+  // Mesec ↔ Plata (or a new payday) keeps the same stretch of time on screen
+  const [shownCfg, setShownCfg] = useState(cfg)
+  if (!sameCfg(shownCfg, cfg)) {
+    setShownCfg(cfg)
+    setMonth(remapPeriod(month, shownCfg, cfg))
+  }
   const [entryOpen, setEntryOpen] = useState(false)
+  const [entryDate, setEntryDate] = useState(todayStr)
   const [editing, setEditing] = useState<Expense | undefined>()
   const [catView, setCatView] = useState<{ category: Category; month: Month } | null>(null)
   const [toast, setToast] = useState('')
@@ -51,6 +60,8 @@ export default function App() {
   }
 
   const openNew = () => {
+    // from Pregled / Istorija a new entry lands in the period on screen
+    setEntryDate(tab === 'home' || tab === 'history' ? defaultDateFor(month, cfg) : todayStr())
     setEditing(undefined)
     setEntryOpen(true)
   }
@@ -90,6 +101,7 @@ export default function App() {
       <EntryPage
         open={entryOpen}
         editing={editing}
+        defaultDate={entryDate}
         onClose={() => setEntryOpen(false)}
         onDone={showToast}
       />
