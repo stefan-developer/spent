@@ -35,6 +35,8 @@
   --good: #d4fb4e;
   --warn: #ff9f0a;
   --shadow-glass: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --spring: cubic-bezier(0.3, 1.2, 0.5, 1); /* overshoots a little, then settles */
+  --ease-glide: cubic-bezier(0.2, 0.8, 0.2, 1);
   --cat-blue: #3987e5;
   --cat-orange: #d95926;
   --cat-aqua: #199e70;
@@ -90,26 +92,101 @@ textarea {
   box-shadow: var(--shadow-glass), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
-/* liquid-glass pill (tab bar): stronger refraction, rim light, top gloss */
-.glass-pill {
+/* ---------- liquid glass (iOS 26 tab bar) ---------- */
+
+/* clear glass: a light lift off the black, light blur, a sheen pooling up top */
+.lg {
   position: relative;
-  background: var(--glass);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 55%),
+    rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px) saturate(190%);
+  -webkit-backdrop-filter: blur(16px) saturate(190%);
   box-shadow:
-    var(--shadow-glass),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+    0 12px 32px -6px rgba(0, 0, 0, 0.65),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 0 14px rgba(255, 255, 255, 0.05); /* thickness: the edge gathers light */
 }
 
-.glass-pill::before {
+/* specular rim: crisp along the top, catching again on the far lower edge */
+.lg::before {
   content: '';
   position: absolute;
   inset: 0;
+  padding: 1px;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 46%);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0.1) 32%,
+      rgba(255, 255, 255, 0) 55%,
+      rgba(255, 255, 255, 0.16)
+    ),
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.28),
+      rgba(255, 255, 255, 0) 22%,
+      rgba(255, 255, 255, 0) 78%,
+      rgba(255, 255, 255, 0.22)
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
   pointer-events: none;
+}
+
+/* the selected tab's capsule; lifts into a lens under a finger */
+.lg-lens {
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+.lg-lens-up {
+  transform: scale(1.1, 1.14);
+  background: rgba(255, 255, 255, 0.17);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.15),
+    inset 0 0 12px rgba(255, 255, 255, 0.1);
+}
+
+/* tinted (prominent) glass: the accent, still see-through at the edges */
+.lg-tint {
+  color: var(--on-accent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 52%),
+    color-mix(in srgb, var(--accent) 86%, transparent);
+  box-shadow:
+    0 10px 24px -10px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.12),
+    inset 0 0 12px rgba(255, 255, 255, 0.3);
+}
+.lg-tint::before {
+  opacity: 0.9;
+}
+
+/* glass swells under a press instead of shrinking */
+.lg-swell {
+  transition: transform 0.45s var(--spring);
+}
+.lg-swell:active {
+  transform: scale(1.08);
+}
+
+/* below the bar: content dims and softens into the bottom edge */
+.scroll-edge {
+  height: calc(env(safe-area-inset-bottom) + 92px);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.6) 45%, rgba(0, 0, 0, 0));
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent);
+  mask-image: linear-gradient(to top, #000 45%, transparent);
 }
 
 .card {
@@ -176,8 +253,13 @@ textarea {
   .animate-pop-in {
     animation: none;
   }
-  .press:active {
+  .press:active,
+  .lg-swell:active,
+  .lg-lens-up {
     transform: none;
+  }
+  .lg-lens {
+    transition: none !important;
   }
 }
 
